@@ -768,6 +768,18 @@ method return sender=:1.386 -> dest=:1.477 reply_serial=2
         </doc:description>
       </doc:doc>
     </property>
+
+    <property name="Seat" type="s" access="read">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Seat name.
+          </doc:para><doc:para>
+            Non-empty value indicates that device has been assigned to a seat.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
   </interface>
 
 </node>

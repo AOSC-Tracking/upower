@@ -6,7 +6,7 @@ Requirements:
 
    glib-2.0             >= 2.34.0
    gio-2.0              >= 2.16.1
-   gudev-1.0            >= 235    (Linux)
+   gudev-1.0            >= 238    (Linux)
    libimobiledevice-1.0 >= 0.9.7  (optional)
 
 UPower is an abstraction for enumerating power devices,

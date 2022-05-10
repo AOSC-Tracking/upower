@@ -88,6 +88,34 @@ is_macbook (gpointer data)
 	return GINT_TO_POINTER(g_str_has_prefix (product, "MacBook"));
 }
 
+static char *
+get_seat_from_device (GUdevDevice *native)
+{
+	const char *const *tags;
+	g_autoptr(GUdevDevice) parent = NULL;
+
+	tags = g_udev_device_get_current_tags (native);
+
+	if (g_strv_contains (tags, "seat")) {
+		int i;
+
+		for (i = 0; tags[i] != NULL; i++) {
+			if (g_str_has_prefix (tags[i], "seat") &&
+			    strlen (tags[i]) > strlen ("seat"))
+				return g_strdup (tags[i]);
+		}
+
+		return g_strdup ("seat0");
+	}
+
+	parent = g_udev_device_get_parent (native);
+
+	if (parent != NULL)
+		return get_seat_from_device (parent);
+
+	return NULL;
+}
+
 static UpDevice *
 device_new (UpEnumeratorUdev *self, GUdevDevice *native)
 {
@@ -99,12 +127,15 @@ device_new (UpEnumeratorUdev *self, GUdevDevice *native)
 
 	subsys = g_udev_device_get_subsystem (native);
 	if (g_strcmp0 (subsys, "power_supply") == 0) {
+		g_autofree char *seat = NULL;
 		UpDevice *device;
 
+		seat = get_seat_from_device (native);
 		device = g_initable_new (UP_TYPE_DEVICE_SUPPLY_BATTERY, NULL, NULL,
 		                       "daemon", daemon,
 		                       "native", native,
 		                       "ignore-system-percentage", GPOINTER_TO_INT (is_macbook (NULL)),
+		                       "seat", seat,
 		                       NULL);
 		if (device)
 			return device;
@@ -112,6 +143,7 @@ device_new (UpEnumeratorUdev *self, GUdevDevice *native)
 		return g_initable_new (UP_TYPE_DEVICE_SUPPLY, NULL, NULL,
 		                       "daemon", daemon,
 		                       "native", native,
+		                       "seat", seat,
 		                       NULL);
 
 	} else if (g_strcmp0 (subsys, "tty") == 0) {
@@ -287,11 +319,21 @@ uevent_signal_handler_cb (UpEnumeratorUdev *self,
 				g_signal_emit_by_name (self, "device-added", up_dev);
 
 		} else {
+			const gchar *subsys;
+
 			if (!UP_IS_DEVICE (obj)) {
 				g_autoptr(GUdevDevice) d = get_latest_udev_device (self, obj);
 				if (d)
 					emit_changes_for_siblings (self, d);
 				return;
+			}
+
+			subsys = g_udev_device_get_subsystem (device);
+			if (g_strcmp0 (subsys, "power_supply") == 0) {
+				g_autofree char *seat = NULL;
+
+				seat = get_seat_from_device (device);
+				g_object_set (obj, "seat", seat, NULL);
 			}
 
 			g_debug ("refreshing device for path %s", g_udev_device_get_sysfs_path (device));

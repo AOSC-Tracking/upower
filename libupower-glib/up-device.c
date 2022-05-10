@@ -35,6 +35,7 @@
 #include <glib-object.h>
 #include <string.h>
 
+#include "up-client.h"
 #include "up-device.h"
 #include "up-device-generated.h"
 #include "up-stats-item.h"
@@ -51,6 +52,8 @@ static void	up_device_finalize	(GObject		*object);
  **/
 struct _UpDevicePrivate
 {
+	UpClient		*client;
+
 	UpExportedDevice		*proxy_device;
 
 	/* For use when a UpDevice isn't backed by a D-Bus object
@@ -60,6 +63,7 @@ struct _UpDevicePrivate
 
 enum {
 	PROP_0,
+	PROP_CLIENT,
 	PROP_UPDATE_TIME,
 	PROP_VENDOR,
 	PROP_MODEL,
@@ -90,6 +94,7 @@ enum {
 	PROP_BATTERY_LEVEL,
 	PROP_ICON_NAME,
 	PROP_CHARGE_CYCLES,
+	PROP_SEAT,
 	PROP_LAST
 };
 
@@ -590,6 +595,14 @@ up_device_set_property (GObject *object, guint prop_id, const GValue *value, GPa
 {
 	UpDevice *device = UP_DEVICE (object);
 
+	switch (prop_id) {
+	case PROP_CLIENT:
+		device->priv->client = g_value_dup_object (value);
+		break;
+	default:
+		break;
+	}
+
 	if (device->priv->proxy_device == NULL) {
 		GValue *v;
 
@@ -691,6 +704,9 @@ up_device_set_property (GObject *object, guint prop_id, const GValue *value, GPa
 		break;
 	case PROP_CHARGE_CYCLES:
 		up_exported_device_set_charge_cycles (device->priv->proxy_device, g_value_get_int (value));
+		break;
+	case PROP_SEAT:
+		up_exported_device_set_seat (device->priv->proxy_device, g_value_get_string (value));
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -809,6 +825,9 @@ up_device_get_property (GObject *object, guint prop_id, GValue *value, GParamSpe
 	case PROP_CHARGE_CYCLES:
 		g_value_set_int (value, up_exported_device_get_charge_cycles (device->priv->proxy_device));
 		break;
+	case PROP_SEAT:
+		g_value_set_string (value, up_exported_device_get_seat (device->priv->proxy_device));
+		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -825,6 +844,16 @@ up_device_class_init (UpDeviceClass *klass)
 	object_class->finalize = up_device_finalize;
 	object_class->set_property = up_device_set_property;
 	object_class->get_property = up_device_get_property;
+
+	g_object_class_install_property (object_class,
+					 PROP_CLIENT,
+					 g_param_spec_object ("client",
+							      "UpClient",
+							      "UpClient reference",
+							      UP_TYPE_CLIENT,
+							      G_PARAM_STATIC_STRINGS |
+							      G_PARAM_WRITABLE |
+							      G_PARAM_CONSTRUCT_ONLY));
 
 	/**
 	 * UpDevice:update-time:
@@ -1225,6 +1254,20 @@ up_device_class_init (UpDeviceClass *klass)
 					 g_param_spec_int ("charge-cycles",
 							   NULL, NULL,
 							   -1, G_MAXINT, -1, G_PARAM_READWRITE));
+
+	/**
+	 * UpDevice:seat:
+	 *
+	 * The seat of the device.
+	 *
+	 * Since: 1.0
+	 **/
+	g_object_class_install_property (object_class,
+					 PROP_SEAT,
+					 g_param_spec_string ("seat",
+							      NULL, NULL,
+							      NULL,
+							      G_PARAM_READWRITE));
 }
 
 static void
@@ -1265,6 +1308,7 @@ up_device_finalize (GObject *object)
 						      device);
 	}
 
+	g_clear_object (&device->priv->client);
 	g_clear_object (&device->priv->proxy_device);
 	g_clear_pointer (&device->priv->offline_props, g_hash_table_unref);
 
@@ -1284,4 +1328,27 @@ UpDevice *
 up_device_new (void)
 {
 	return UP_DEVICE (g_object_new (UP_TYPE_DEVICE, NULL));
+}
+
+gboolean
+up_device_is_available_to_seat (UpDevice *device)
+{
+	const char *client_seat;
+	const char *device_seat;
+
+	g_return_val_if_fail (UP_IS_DEVICE (device), TRUE);
+
+	if (device->priv->client == NULL)
+		return TRUE;
+
+	client_seat = up_client_get_seat (device->priv->client);
+	if (client_seat == NULL)
+		return TRUE;
+
+	/* NULL/empty seat means that device is available to all seats */
+	device_seat = up_exported_device_get_seat (device->priv->proxy_device);
+	if (device_seat == NULL || *device_seat == '\0')
+		return TRUE;
+
+	return g_str_equal (client_seat, device_seat);
 }
