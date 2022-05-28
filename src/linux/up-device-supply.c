@@ -538,6 +538,8 @@ up_device_supply_refresh_battery (UpDeviceSupply *supply,
 	gboolean ac_online = FALSE;
 	gboolean has_ac = FALSE;
 	gboolean online;
+	const gchar *ideapad_path;
+	gboolean conservation_mode_on = FALSE;
 	UpDeviceList *devices_list;
 	GPtrArray *devices;
 	guint i;
@@ -730,9 +732,18 @@ up_device_supply_refresh_battery (UpDeviceSupply *supply,
 		g_ptr_array_unref (devices);
 		g_object_unref (devices_list);
 
+		/* On some Lenovo laptops, this battery state might indicate the conservation
+		 * mode is enabled. When the ideapad_laptop kernel module is loaded, the status
+		 * of this battery feature is available on sysfs. */
+		ideapad_path = "/sys/bus/platform/drivers/ideapad_acpi/VPC2004:00";
+		if (sysfs_file_exists(ideapad_path, "conservation_mode"))
+			conservation_mode_on = sysfs_get_bool(ideapad_path, "conservation_mode");
+
 		if (has_ac) {
 			if (ac_online) {
-				if (percentage > UP_DEVICE_SUPPLY_CHARGED_THRESHOLD)
+				if (conservation_mode_on)
+					state = UP_DEVICE_STATE_PENDING_CHARGE;
+				else if (percentage > UP_DEVICE_SUPPLY_CHARGED_THRESHOLD)
 					state = UP_DEVICE_STATE_FULLY_CHARGED;
 				else
 					state = UP_DEVICE_STATE_CHARGING;
