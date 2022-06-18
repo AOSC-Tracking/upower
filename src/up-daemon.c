@@ -119,6 +119,34 @@ up_daemon_get_number_devices_of_type (UpDaemon *daemon, UpDeviceKind type)
 }
 
 /**
+ * Lenovo IdeaPad laptop models offer a battery conservation mode to limit
+ * battery charging to 55-60% of its capacity to improve battery life.
+ **/
+static gboolean
+is_conservation_mode ()
+{
+	gboolean result;
+	char *contents;
+	char *filename;
+	const gchar *ideapad_path;
+
+	ideapad_path = "/sys/bus/platform/drivers/ideapad_acpi/VPC2004:00";
+
+	result = FALSE;
+	filename = g_build_filename (ideapad_path, "conservation_mode", NULL);
+	if (g_file_test (filename, G_FILE_TEST_EXISTS)) {
+		if (g_file_get_contents (filename, &contents, NULL, NULL)) {
+			g_strdelimit (contents, "\n", '\0');
+			result = (g_strcmp0 (contents, "1") == 0);
+			g_free (contents);
+		}
+	}
+	g_free (filename);
+
+	return result;
+}
+
+/**
  * up_daemon_update_display_battery:
  *
  * Update our internal state.
@@ -244,7 +272,9 @@ up_daemon_update_display_battery (UpDaemon *daemon)
 
 		if (has_ac) {
 			if (ac_online) {
-				if (percentage_total >= UP_FULLY_CHARGED_THRESHOLD)
+				if (is_conservation_mode ())
+					state_total = UP_DEVICE_STATE_PENDING_CHARGE;
+				else if (percentage_total >= UP_FULLY_CHARGED_THRESHOLD)
 					state_total = UP_DEVICE_STATE_FULLY_CHARGED;
 				else
 					state_total = UP_DEVICE_STATE_CHARGING;
