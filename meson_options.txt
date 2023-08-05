@@ -33,3 +33,7 @@ option('idevice',
        type : 'feature',
        value : 'auto',
        description : 'Build with libimobiledevice')
+option('installed_tests',
+       type : 'boolean',
+       value : 'true',
+       description : 'Install integration tests')
