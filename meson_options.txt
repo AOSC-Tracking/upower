@@ -40,3 +40,7 @@ option('polkit',
        type: 'feature',
        value: 'auto',
        description: 'PolKit support in daemon')
+option('installed_tests',
+       type : 'boolean',
+       value : 'true',
+       description : 'Install integration tests')
