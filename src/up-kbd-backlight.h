@@ -34,7 +34,15 @@ G_BEGIN_DECLS
 #define UP_IS_KBD_BACKLIGHT_CLASS(k)	(G_TYPE_CHECK_CLASS_TYPE ((k), UP_TYPE_KBD_BACKLIGHT))
 #define UP_KBD_BACKLIGHT_GET_CLASS(o)	(G_TYPE_INSTANCE_GET_CLASS ((o), UP_TYPE_KBD_BACKLIGHT, UpKbdBacklightClass))
 
+#define UP_TYPE_KBD_BACKLIGHT_DEVICE		(up_kbd_backlight_device_get_type ())
+#define UP_KBD_BACKLIGHT_DEVICE(o)		(G_TYPE_CHECK_INSTANCE_CAST ((o), UP_TYPE_KBD_BACKLIGHT_DEVICE, UpKbdBacklightDevice))
+#define UP_KBD_BACKLIGHT_DEVICE_CLASS(k)	(G_TYPE_CHECK_CLASS_CAST((k), UP_TYPE_KBD_BACKLIGHT_DEVICE, UpKbdBacklightDeviceClass))
+#define UP_IS_KBD_BACKLIGHT_DEVICE(o)		(G_TYPE_CHECK_INSTANCE_TYPE ((o), UP_TYPE_KBD_BACKLIGHT_DEVICE))
+#define UP_IS_KBD_BACKLIGHT_DEVICE_CLASS(k)	(G_TYPE_CHECK_CLASS_TYPE ((k), UP_TYPE_KBD_BACKLIGHT_DEVICE))
+#define UP_KBD_BACKLIGHT_DEVICE_GET_CLASS(o)	(G_TYPE_INSTANCE_GET_CLASS ((o), UP_TYPE_KBD_BACKLIGHT_DEVICE, UpKbdBacklightDeviceClass))
+
 typedef struct UpKbdBacklightPrivate UpKbdBacklightPrivate;
+typedef struct UpKbdBacklightDevicePrivate UpKbdBacklightDevicePrivate;
 
 typedef struct
 {
@@ -44,13 +52,27 @@ typedef struct
 
 typedef struct
 {
+	GObject parent;
+	UpKbdBacklightDevicePrivate	 *priv;
+} UpKbdBacklightDevice;
+
+typedef struct
+{
 	UpExportedKbdBacklightSkeletonClass parent_class;
 } UpKbdBacklightClass;
+
+typedef struct
+{
+	GObjectClass	 parent_class;
+} UpKbdBacklightDeviceClass;
 
 UpKbdBacklight	*up_kbd_backlight_new			(void);
 GType		 up_kbd_backlight_get_type		(void);
 void		 up_kbd_backlight_register 		(UpKbdBacklight *kbd_backlight,
 							 GDBusConnection *connection);
+
+UpKbdBacklightDevice	*up_kbd_backlight_device_new			(void);
+GType		 			 up_kbd_backlight_device_get_type		(void);
 
 G_END_DECLS
 
