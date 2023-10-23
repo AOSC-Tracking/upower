@@ -84,6 +84,10 @@ typedef struct {
 	UpDeviceTechnology technology;
 	gdouble voltage_design;
 	gint charge_cycles;
+	// depends on file written in /var/lib/upower
+	gboolean charge_control_enabled;
+	gdouble charge_control_start_threshold;
+	gdouble charge_control_end_threshold;
 } UpBatteryInfo;
 
 
