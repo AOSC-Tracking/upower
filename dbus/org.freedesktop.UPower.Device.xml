@@ -828,6 +828,26 @@ method return sender=:1.386 -> dest=:1.477 reply_serial=2
         </doc:description>
       </doc:doc>
     </property>
+
+    <property name="ChargeStartThreshold" type="u" access="read">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            <p>When a start charge threshold is set the battery won't get charged until the charge drops under this threshold.</p>
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
+
+    <property name="ChargeEndThreshold" type="u" access="read">
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            <p>The end charge threshold stops the battery from getting charged after the set threshold</p>
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
   </interface>
 
 </node>

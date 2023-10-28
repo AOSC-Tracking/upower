@@ -437,6 +437,7 @@ up_device_battery_update_info (UpDeviceBattery *self, UpBatteryInfo *info)
 
 		/* See above, we have a (new) battery plugged in. */
 		if (!priv->present) {
+			g_warning("%s %f", "updating charge-start-threshold", info->charge_control_start_threshold);
 			g_object_set (self,
 			              "is-present", TRUE,
 			              "vendor", info->vendor,
@@ -445,6 +446,8 @@ up_device_battery_update_info (UpDeviceBattery *self, UpBatteryInfo *info)
 			              "technology", info->technology,
 			              "has-history", TRUE,
 			              "has-statistics", TRUE,
+				      "charge-start-threshold", info->charge_control_start_threshold,
+				      "charge-end-threshold", info->charge_control_end_threshold,
 			              NULL);
 
 			priv->present = TRUE;
@@ -512,6 +515,8 @@ up_device_battery_update_info (UpDeviceBattery *self, UpBatteryInfo *info)
 		              "has-history", FALSE,
 		              "has-statistics", FALSE,
 		              "update-time", (guint64) g_get_real_time () / G_USEC_PER_SEC,
+			      "charge-start-threshold", 0,
+			      "charge-end-threshold", 100,
 		              NULL);
 	}
 }

@@ -90,6 +90,8 @@ enum {
 	PROP_BATTERY_LEVEL,
 	PROP_ICON_NAME,
 	PROP_CHARGE_CYCLES,
+	PROP_CHARGE_START_THRESHOLD,
+	PROP_CHARGE_END_THRESHOLD,
 	PROP_LAST
 };
 
@@ -386,6 +388,10 @@ up_device_to_text (UpDevice *device)
 	if (kind == UP_DEVICE_KIND_BATTERY) {
 		if (up_exported_device_get_technology (priv->proxy_device) != UP_DEVICE_TECHNOLOGY_UNKNOWN)
 			g_string_append_printf (string, "    technology:          %s\n", up_device_technology_to_string (up_exported_device_get_technology (priv->proxy_device)));
+		if (up_exported_device_get_charge_start_threshold (priv->proxy_device) > 0)
+			g_string_append_printf (string, "    charge-start-threshold:        %d%%\n", up_exported_device_get_charge_start_threshold (priv->proxy_device));
+		if (up_exported_device_get_charge_end_threshold (priv->proxy_device) > 0)
+			g_string_append_printf (string, "    charge-end-threshold:          %d%%\n", up_exported_device_get_charge_end_threshold (priv->proxy_device));
 	}
 	if (kind == UP_DEVICE_KIND_LINE_POWER)
 		g_string_append_printf (string, "    online:              %s\n", up_device_bool_to_string (up_exported_device_get_online (priv->proxy_device)));
@@ -692,6 +698,12 @@ up_device_set_property (GObject *object, guint prop_id, const GValue *value, GPa
 	case PROP_CHARGE_CYCLES:
 		up_exported_device_set_charge_cycles (device->priv->proxy_device, g_value_get_int (value));
 		break;
+	case PROP_CHARGE_START_THRESHOLD:
+		up_exported_device_set_charge_start_threshold (device->priv->proxy_device, g_value_get_double (value));
+		break;
+	case PROP_CHARGE_END_THRESHOLD:
+		up_exported_device_set_charge_end_threshold (device->priv->proxy_device, g_value_get_double (value));
+		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -808,6 +820,12 @@ up_device_get_property (GObject *object, guint prop_id, GValue *value, GParamSpe
 		break;
 	case PROP_CHARGE_CYCLES:
 		g_value_set_int (value, up_exported_device_get_charge_cycles (device->priv->proxy_device));
+		break;
+	case PROP_CHARGE_START_THRESHOLD:
+		g_value_set_uint (value, up_exported_device_get_charge_start_threshold (device->priv->proxy_device));
+		break;
+	case PROP_CHARGE_END_THRESHOLD:
+		g_value_set_uint (value, up_exported_device_get_charge_end_threshold (device->priv->proxy_device));
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1222,9 +1240,36 @@ up_device_class_init (UpDeviceClass *klass)
 	 **/
 	g_object_class_install_property (object_class,
 					 PROP_CHARGE_CYCLES,
-					 g_param_spec_int ("charge-cycles",
+					 g_param_spec_uint ("charge-cycles",
 							   NULL, NULL,
 							   -1, G_MAXINT, -1, G_PARAM_READWRITE));
+
+	/**
+	 * UpDevice:charge-start-threshold:
+	 *
+	 * The charge start threshold of a battery.
+	 *
+	 * Since: 1.X TODO
+	 **/
+	g_object_class_install_property (object_class,
+					 PROP_CHARGE_START_THRESHOLD,
+					 g_param_spec_uint ("charge-start-threshold",
+							   NULL, NULL,
+							   0, 100, 0, G_PARAM_READWRITE));
+
+	/**
+	 * UpDevice:charge-end-threshold:
+	 *
+	 * The charge end threshold of a battery.
+	 *
+	 * Since: 1.X TODO
+	 **/
+	g_object_class_install_property (object_class,
+					 PROP_CHARGE_END_THRESHOLD,
+					 g_param_spec_uint ("charge-end-threshold",
+							   NULL, NULL,
+							   0, 100, 100, G_PARAM_READWRITE));
+
 }
 
 static void
