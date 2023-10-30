@@ -86,8 +86,9 @@ typedef struct {
 	gint charge_cycles;
 	// depends on file written in /var/lib/upower
 	gboolean charge_control_enabled;
-	gdouble charge_control_start_threshold;
-	gdouble charge_control_end_threshold;
+	gboolean charge_control_supported;
+	guint charge_control_start_threshold;
+	guint charge_control_end_threshold;
 } UpBatteryInfo;
 
 

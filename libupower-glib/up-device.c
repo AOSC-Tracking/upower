@@ -92,6 +92,8 @@ enum {
 	PROP_CHARGE_CYCLES,
 	PROP_CHARGE_START_THRESHOLD,
 	PROP_CHARGE_END_THRESHOLD,
+	PROP_CHARGE_THRESHOLD_ENABLED,
+	PROP_CHARGE_THRESHOLD_SUPPORTED,
 	PROP_LAST
 };
 
@@ -392,6 +394,10 @@ up_device_to_text (UpDevice *device)
 			g_string_append_printf (string, "    charge-start-threshold:        %d%%\n", up_exported_device_get_charge_start_threshold (priv->proxy_device));
 		if (up_exported_device_get_charge_end_threshold (priv->proxy_device) > 0)
 			g_string_append_printf (string, "    charge-end-threshold:          %d%%\n", up_exported_device_get_charge_end_threshold (priv->proxy_device));
+		if (up_exported_device_get_charge_threshold_enabled (priv->proxy_device))
+			g_string_append_printf (string, "    charge-threshold-enabled:          %d\n", up_exported_device_get_charge_threshold_enabled (priv->proxy_device));
+		if (up_exported_device_get_charge_threshold_supported (priv->proxy_device))
+			g_string_append_printf (string, "    charge-threshold-supported:          %d\n", up_exported_device_get_charge_threshold_supported (priv->proxy_device));
 	}
 	if (kind == UP_DEVICE_KIND_LINE_POWER)
 		g_string_append_printf (string, "    online:              %s\n", up_device_bool_to_string (up_exported_device_get_online (priv->proxy_device)));
@@ -704,6 +710,12 @@ up_device_set_property (GObject *object, guint prop_id, const GValue *value, GPa
 	case PROP_CHARGE_END_THRESHOLD:
 		up_exported_device_set_charge_end_threshold (device->priv->proxy_device, g_value_get_double (value));
 		break;
+	case PROP_CHARGE_THRESHOLD_ENABLED:
+		up_exported_device_set_charge_threshold_enabled (device->priv->proxy_device, g_value_get_boolean (value));
+		break;
+	case PROP_CHARGE_THRESHOLD_SUPPORTED:
+		up_exported_device_set_charge_threshold_supported (device->priv->proxy_device, g_value_get_boolean (value));
+		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -826,6 +838,12 @@ up_device_get_property (GObject *object, guint prop_id, GValue *value, GParamSpe
 		break;
 	case PROP_CHARGE_END_THRESHOLD:
 		g_value_set_uint (value, up_exported_device_get_charge_end_threshold (device->priv->proxy_device));
+		break;
+	case PROP_CHARGE_THRESHOLD_ENABLED:
+		g_value_set_boolean (value, up_exported_device_get_charge_threshold_enabled (device->priv->proxy_device));
+		break;
+	case PROP_CHARGE_THRESHOLD_SUPPORTED:
+		g_value_set_boolean (value, up_exported_device_get_charge_threshold_supported (device->priv->proxy_device));
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1270,6 +1288,35 @@ up_device_class_init (UpDeviceClass *klass)
 							   NULL, NULL,
 							   0, 100, 100, G_PARAM_READWRITE));
 
+	/**
+	 * UpDevice:charge-threshold-enabled:
+	 *
+	 * The charge threshold of a battery is enabled, or false if unknown
+	 * or non-applicable.
+	 *
+	 * Since: 1.X TODO
+	 **/
+	g_object_class_install_property (object_class,
+					 PROP_CHARGE_THRESHOLD_ENABLED,
+					 g_param_spec_boolean ("charge-threshold-enabled",
+							   NULL, NULL,
+							   FALSE,
+							   G_PARAM_READWRITE));
+
+	/**
+	 * UpDevice:charge-threshold-supported:
+	 *
+	 * The charge threshold of a battery is supported, or false if unknown
+	 * or non-applicable.
+	 *
+	 * Since: 1.X TODO
+	 **/
+	g_object_class_install_property (object_class,
+					 PROP_CHARGE_THRESHOLD_SUPPORTED,
+					 g_param_spec_boolean ("charge-threshold-supported",
+							   NULL, NULL,
+							   FALSE,
+							   G_PARAM_READWRITE));
 }
 
 static void

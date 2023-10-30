@@ -220,8 +220,11 @@ up_device_supply_battery_refresh (UpDevice *device,
 	if (get_charge_control_limits (native, &charge_control_limit)) {
 		info.charge_control_start_threshold = charge_control_limit.charge_control_start_treshold;
 		info.charge_control_end_threshold = charge_control_limit.charge_control_end_treshold;
-		info.charge_control_enabled = TRUE;
-		g_warning ("charge start: %lf, end: %lf", info.charge_control_start_threshold, info.charge_control_end_threshold);
+		info.charge_control_supported = TRUE;
+		info.charge_control_enabled = FALSE;
+	} else {
+		info.charge_control_enabled = FALSE;
+		info.charge_control_supported = FALSE;
 	}
 
 	/* NOTE: We used to warn about full > design, but really that is prefectly fine to happen. */
@@ -364,6 +367,45 @@ up_device_supply_battery_get_property (GObject        *object,
 	}
 }
 
+static char *
+up_device_supply_device_path (GUdevDevice *device)
+{
+        const char *root;
+        root = g_getenv ("UMOCKDEV_DIR");
+        if (!root || *root == '\0') {
+                return g_strdup (g_udev_device_get_sysfs_path (device));
+	}
+
+        return g_build_filename (root,
+                                 g_udev_device_get_sysfs_path (device),
+                                 NULL);
+}
+
+static void
+up_device_supply_battery_set_charge_limits(UpDevice *device, guint start, guint end) {
+        GUdevDevice *native;
+	g_autofree gchar *native_path;
+	g_autofree gchar *start_filename;
+	g_autofree gchar *end_filename;
+	FILE *fp;
+
+	native = G_UDEV_DEVICE (up_device_get_native (device));
+	native_path = up_device_supply_device_path (native);
+	start_filename = g_build_filename(native_path, "charge_control_start_threshold", NULL);
+	end_filename = g_build_filename(native_path, "charge_control_end_threshold", NULL);
+
+	/* Not all devices have a start, but all do have an end */
+	if (g_file_test (start_filename, G_FILE_TEST_EXISTS)) {
+		fp = fopen(start_filename, "w");
+		fprintf(fp, "%d", start);
+		fclose(fp);
+	}
+
+	fp = fopen(end_filename, "w");
+	fprintf(fp, "%d", end);
+	fclose(fp);
+}
+
 static void
 up_device_supply_battery_class_init (UpDeviceSupplyBatteryClass *klass)
 {
@@ -374,6 +416,7 @@ up_device_supply_battery_class_init (UpDeviceSupplyBatteryClass *klass)
 	object_class->get_property = up_device_supply_battery_get_property;
 	device_class->coldplug = up_device_supply_coldplug;
 	device_class->refresh = up_device_supply_battery_refresh;
+	device_class->set_battery_charge_thresholds = up_device_supply_battery_set_charge_limits;
 
 	g_object_class_install_property (object_class, PROP_IGNORE_SYSTEM_PERCENTAGE,
 					 g_param_spec_boolean ("ignore-system-percentage",
