@@ -381,29 +381,51 @@ up_device_supply_device_path (GUdevDevice *device)
                                  NULL);
 }
 
-static void
-up_device_supply_battery_set_charge_limits(UpDevice *device, guint start, guint end) {
+static gboolean
+write_charge_threshold (gchar* filename, guint val, GError **error) {
+	FILE *fp;
+	fp = fopen (filename, "w");
+	gboolean ret = TRUE;
+
+	if (!fp) {
+		g_set_error (error, 1, 0, "%s", g_strerror (errno));
+		goto out;
+	}
+
+	if (!fprintf (fp, "%d", val)) {
+		g_set_error (error, 1, 0, "%s", g_strerror (errno));
+		ret = FALSE;
+	}
+
+	fclose (fp);
+out:
+	return ret;
+}
+
+static gboolean
+up_device_supply_battery_set_charge_limits(UpDevice *device, guint start, guint end, GError **error) {
         GUdevDevice *native;
+	gboolean ret = TRUE;
 	g_autofree gchar *native_path;
 	g_autofree gchar *start_filename;
 	g_autofree gchar *end_filename;
-	FILE *fp;
 
 	native = G_UDEV_DEVICE (up_device_get_native (device));
 	native_path = up_device_supply_device_path (native);
-	start_filename = g_build_filename(native_path, "charge_control_start_threshold", NULL);
-	end_filename = g_build_filename(native_path, "charge_control_end_threshold", NULL);
+	start_filename = g_build_filename (native_path, "charge_control_start_threshold", NULL);
+	end_filename = g_build_filename (native_path, "charge_control_end_threshold", NULL);
 
-	/* Not all devices have a start, but all do have an end */
-	if (g_file_test (start_filename, G_FILE_TEST_EXISTS)) {
-		fp = fopen(start_filename, "w");
-		fprintf(fp, "%d", start);
-		fclose(fp);
+	// HACK: when glib 2.66 is supported use g_file_set_contents_full with G_FILE_SET_CONTENTS_NONE
+	if (!write_charge_threshold (start_filename, start, error)) {
+		ret = FALSE;
+		goto out;
 	}
 
-	fp = fopen(end_filename, "w");
-	fprintf(fp, "%d", end);
-	fclose(fp);
+	if (!write_charge_threshold (end_filename, end, error))
+		ret = FALSE;
+
+out:
+	return ret;
 }
 
 static void

@@ -64,6 +64,7 @@ typedef struct {
 typedef struct {
 	gboolean present;
 
+        const char *name;
 	const char *vendor;
 	const char *model;
 	const char *serial;

@@ -54,9 +54,10 @@ struct _UpDeviceClass
 						 gboolean	*on_battery);
 	gboolean	 (*get_online)		(UpDevice	*device,
 						 gboolean	*online);
-	void		 (*set_battery_charge_thresholds) (UpDevice *device,
+	gboolean	 (*set_battery_charge_thresholds) (UpDevice *device,
 							   guint     start,
-							   guint     end);
+							   guint     end,
+							   GError    **error);
 };
 
 GType		 up_device_get_type		(void);

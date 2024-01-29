@@ -176,7 +176,7 @@ class Tests(dbusmock.DBusTestCase):
     # Daemon control and D-BUS I/O
     #
 
-    def start_daemon(self, cfgfile=None, warns=False, charge_threshold_value=None):
+    def start_daemon(self, cfgfile=None, warns=False, charge_threshold_value=None, model_serial_name=None):
         '''Start daemon and create DBus proxy.
 
         Do this after adding the devices you want to test with. At the moment
@@ -192,8 +192,8 @@ class Tests(dbusmock.DBusTestCase):
         env['UPOWER_CONF_FILE_NAME'] = cfgfile
         self.upower_history_dir = env['UPOWER_HISTORY_DIR'] = tempfile.mkdtemp(prefix='upower-history-')
         self.addCleanup(shutil.rmtree, env['UPOWER_HISTORY_DIR'])
-        if charge_threshold_value is not None:
-            with open(os.path.join(self.upower_history_dir, 'charge-threshold-enabled') , 'w') as fp:
+        if charge_threshold_value is not None and model_serial_name is not None:
+            with open(os.path.join(self.upower_history_dir, f"{model_serial_name}-threshold-enabled") , 'w') as fp:
                 fp.write(charge_threshold_value)
 
         env['G_DEBUG'] = 'fatal-criticals' if warns else 'fatal-warnings'
@@ -1066,6 +1066,8 @@ class Tests(dbusmock.DBusTestCase):
         self.testbed.add_device('power_supply', 'BAT0', None,
                                 ['type', 'Battery',
                                  'present', '1',
+                                 'model_name', 'test',
+                                 'serial_number', '12',
                                  'status', 'unknown',
                                  'energy_full', '60000000',
                                  'energy_full_design', '80000000',
@@ -1077,7 +1079,7 @@ class Tests(dbusmock.DBusTestCase):
         self.testbed.set_property("/sys/class/power_supply/BAT0", 'CHARGE_LIMIT', '70,80')
 
         def start_daemon(charge_threshold_value=None):
-            self.start_daemon(charge_threshold_value=charge_threshold_value)
+            self.start_daemon(charge_threshold_value=charge_threshold_value, model_serial_name='test-12')
             devs = self.proxy.EnumerateDevices()
             self.assertEqual(len(devs), 1)
             return devs[0]
