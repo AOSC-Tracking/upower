@@ -625,8 +625,8 @@ up_device_battery_set_charge_limit (UpExportedDevice *skeleton,
 	if (!charge_threshold_supported) {
 		g_dbus_method_invocation_return_error (invocation,
 						       UP_DAEMON_ERROR, UP_DAEMON_ERROR_GENERAL,
-						       "unsupported battery charge limits %d", enabled);
-		return ret;
+						       "setting battery charge thresholds is unsupported");
+		return TRUE;
 	}
 
         state_file = g_strdup_printf("%s-%s-threshold-enabled", model, serial);
@@ -635,21 +635,21 @@ up_device_battery_set_charge_limit (UpExportedDevice *skeleton,
 		g_dbus_method_invocation_return_error (invocation,
 						       UP_DAEMON_ERROR, UP_DAEMON_ERROR_GENERAL,
 						       "writing charge limits state file '%s' failed", state_file);
-		return ret;
+		return TRUE;
 	}
 
 
 	if (enabled) {
 		ret = up_device_battery_set_charge_thresholds (self, charge_start_threshold, charge_end_threshold, &error);
                 if (!ret) {
-		    g_dbus_method_invocation_return_gerror (invocation, error);
-		    return ret;
+			g_dbus_method_invocation_return_gerror (invocation, error);
+			return TRUE;
                 }
 	} else {
 		ret = up_device_battery_set_charge_thresholds (self, 0, 100, &error);
                 if (!ret) {
-		    g_dbus_method_invocation_return_gerror (invocation, error);
-		    return ret;
+			g_dbus_method_invocation_return_gerror (invocation, error);
+			return TRUE;
                 }
 	}
 
