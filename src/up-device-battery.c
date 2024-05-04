@@ -46,6 +46,7 @@ typedef struct {
 	gdouble energy_design;
 	gint charge_cycles;
 
+	gboolean always_update_energy_full;
 	gboolean trust_power_measurement;
 	gint64 last_power_discontinuity;
 
@@ -307,6 +308,13 @@ up_device_battery_report (UpDeviceBattery *self,
 		              "capacity", MIN (priv->energy_full / priv->energy_design * 100.0, 100),
 		              "energy-full", priv->energy_full,
 		              NULL);
+
+		/* QUIRK:
+		 *
+		 * Some Macbook Airs have a short blip where both energy_full and energy.cur
+		 * are scaled up by some factor. However, they both eventually return back
+		 * to normal, so energy_full must be updated. */
+		priv->always_update_energy_full = TRUE;
 	}
 
 	/* Infer percentage if unknown */
@@ -472,7 +480,7 @@ up_device_battery_update_info (UpDeviceBattery *self, UpBatteryInfo *info)
 		/* Force -1 for unknown value (where 0 is also an unknown value) */
 		charge_cycles = info->charge_cycles > 0 ? info->charge_cycles : -1;
 
-		if (energy_full != priv->energy_full_reported || energy_design != priv->energy_design) {
+		if (energy_full != priv->energy_full_reported || energy_design != priv->energy_design || (priv->always_update_energy_full && energy_full != priv->energy_full)) {
 			priv->energy_full = energy_full;
 			priv->energy_full_reported = energy_full;
 			priv->energy_design = energy_design;
