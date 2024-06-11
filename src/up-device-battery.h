@@ -64,6 +64,7 @@ typedef struct {
 typedef struct {
 	gboolean present;
 
+        const char *name;
 	const char *vendor;
 	const char *model;
 	const char *serial;
@@ -84,6 +85,11 @@ typedef struct {
 	UpDeviceTechnology technology;
 	gdouble voltage_design;
 	gint charge_cycles;
+	// depends on file written in /var/lib/upower
+	gboolean charge_control_enabled;
+	gboolean charge_control_supported;
+	guint charge_control_start_threshold;
+	guint charge_control_end_threshold;
 } UpBatteryInfo;
 
 

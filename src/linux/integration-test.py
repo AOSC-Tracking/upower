@@ -176,7 +176,7 @@ class Tests(dbusmock.DBusTestCase):
     # Daemon control and D-BUS I/O
     #
 
-    def start_daemon(self, cfgfile=None, warns=False):
+    def start_daemon(self, cfgfile=None, warns=False, charge_threshold_value=None, model_serial_name=None):
         '''Start daemon and create DBus proxy.
 
         Do this after adding the devices you want to test with. At the moment
@@ -190,8 +190,12 @@ class Tests(dbusmock.DBusTestCase):
             _, cfgfile = tempfile.mkstemp(prefix='upower-cfg-')
             self.addCleanup(os.unlink, cfgfile)
         env['UPOWER_CONF_FILE_NAME'] = cfgfile
-        env['UPOWER_HISTORY_DIR'] = tempfile.mkdtemp(prefix='upower-history-')
+        self.upower_history_dir = env['UPOWER_HISTORY_DIR'] = tempfile.mkdtemp(prefix='upower-history-')
         self.addCleanup(shutil.rmtree, env['UPOWER_HISTORY_DIR'])
+        if charge_threshold_value is not None and model_serial_name is not None:
+            with open(os.path.join(self.upower_history_dir, f"{model_serial_name}-threshold-enabled") , 'w') as fp:
+                fp.write(charge_threshold_value)
+
         env['G_DEBUG'] = 'fatal-criticals' if warns else 'fatal-warnings'
         # note: Python doesn't propagate the setenv from Testbed.new(), so we
         # have to do that ourselves
@@ -286,6 +290,16 @@ class Tests(dbusmock.DBusTestCase):
                                    None,
                                    Gio.DBusCallFlags.NO_AUTO_START,
                                    -1, None).unpack()[0]
+
+    def enable_charge_limits(self, device, enable):
+        self.dbus.call_sync(UP, device,
+                            'org.freedesktop.UPower.Device',
+                            'EnableChargeLimit',
+                            GLib.Variant('(b)', (enable,)),
+                            None,
+                            Gio.DBusCallFlags.NO_AUTO_START,
+                            -1, None)
+
 
     def assertDevs(self, expected):
         devs = self.proxy.EnumerateDevices()
@@ -993,6 +1007,156 @@ class Tests(dbusmock.DBusTestCase):
 
         self.start_daemon()
         self.assertEqual(self.get_dbus_display_property('IsPresent'), True)
+        self.stop_daemon()
+
+    def test_battery_charge_limit_multiple_batteries(self):
+        '''Battery with charge limits with multiple batteries'''
+
+        self.testbed.add_device('power_supply', 'BAT0', None,
+                                ['type', 'Battery',
+                                 'present', '1',
+                                 'status', 'unknown',
+                                 'energy_full', '60000000',
+                                 'energy_full_design', '80000000',
+                                 'energy_now', '48000000',
+                                 'voltage_now', '12000000',
+                                 'charge_control_start_threshold', '0',
+                                 'charge_control_end_threshold', '100',
+                                 ], [])
+        self.testbed.set_property("/sys/class/power_supply/BAT0", 'CHARGE_LIMIT', '70,80')
+
+        self.testbed.add_device('power_supply', 'BAT1', None,
+                                ['type', 'Battery',
+                                 'present', '1',
+                                 'status', 'unknown',
+                                 'energy_full', '60000000',
+                                 'energy_full_design', '80000000',
+                                 'energy_now', '48000000',
+                                 'voltage_now', '12000000',
+                                 'charge_control_start_threshold', '0',
+                                 'charge_control_end_threshold', '100',
+                                 ], [])
+        self.testbed.set_property("/sys/class/power_supply/BAT1", 'CHARGE_LIMIT', '70,80')
+
+        self.start_daemon()
+        devs = self.proxy.EnumerateDevices()
+        self.assertEqual(len(devs), 2)
+        bat0_up = devs[0]
+        bat1_up = devs[0]
+
+        for bat in [bat0_up, bat1_up]:
+            self.assertEqual(self.get_dbus_dev_property(bat, 'ChargeThresholdSupported'), True)
+            self.assertEqual(self.get_dbus_dev_property(bat, 'ChargeThresholdEnabled'), False)
+            self.assertEqual(self.get_dbus_dev_property(bat, 'ChargeStartThreshold'), 70)
+            self.assertEqual(self.get_dbus_dev_property(bat, 'ChargeEndThreshold'), 80)
+
+        self.enable_charge_limits(bat0_up, True)
+        self.enable_charge_limits(bat1_up, True)
+        for bat in [bat0_up, bat1_up]:
+            self.assertEqual(self.get_dbus_dev_property(bat, 'ChargeThresholdEnabled'), True)
+            battery_name = bat.split('_')[-1]
+            with open(f'/sys/class/power_supply/{battery_name}/charge_control_start_threshold') as fp:
+                self.assertEqual(fp.read(), '70')
+            with open(f'/sys/class/power_supply/{battery_name}/charge_control_end_threshold') as fp:
+                self.assertEqual(fp.read(), '80')
+
+    def test_battery_charge_limit_supported(self):
+        '''Battery with charge_control_start/end_threshold supported'''
+
+        self.testbed.add_device('power_supply', 'BAT0', None,
+                                ['type', 'Battery',
+                                 'present', '1',
+                                 'model_name', 'test',
+                                 'serial_number', '12',
+                                 'status', 'unknown',
+                                 'energy_full', '60000000',
+                                 'energy_full_design', '80000000',
+                                 'energy_now', '48000000',
+                                 'voltage_now', '12000000',
+                                 'charge_control_start_threshold', '0',
+                                 'charge_control_end_threshold', '100',
+                                 ], [])
+        self.testbed.set_property("/sys/class/power_supply/BAT0", 'CHARGE_LIMIT', '70,80')
+
+        def start_daemon(charge_threshold_value=None):
+            self.start_daemon(charge_threshold_value=charge_threshold_value, model_serial_name='test-12')
+            devs = self.proxy.EnumerateDevices()
+            self.assertEqual(len(devs), 1)
+            return devs[0]
+
+        bat0_up = start_daemon()
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdSupported'), True)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdEnabled'), False)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeStartThreshold'), 70)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeEndThreshold'), 80)
+
+        self.enable_charge_limits(bat0_up, True)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdEnabled'), True)
+        # charge limits enabled?
+        with open('/sys/class/power_supply/BAT0/charge_control_start_threshold') as fp:
+            self.assertEqual(fp.read(), '70')
+        with open('/sys/class/power_supply/BAT0/charge_control_end_threshold') as fp:
+            self.assertEqual(fp.read(), '80')
+
+        self.enable_charge_limits(bat0_up, False)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdEnabled'), False)
+        with open('/sys/class/power_supply/BAT0/charge_control_start_threshold') as fp:
+            self.assertEqual(fp.read(), '0')
+        with open('/sys/class/power_supply/BAT0/charge_control_end_threshold') as fp:
+            self.assertEqual(fp.read(), '100')
+
+        # TODO: Test changing CHARGE_LIMIT
+        # self.testbed.set_property("/sys/class/power_supply/BAT0", 'CHARGE_LIMIT', '20,30')
+        # self.testbed.uevent("/sys/class/power_supply/BAT0", 'change')
+        # devs = self.proxy.EnumerateDevices()
+        # bat0_up = devs[0]
+        # self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeStartThreshold'), 20)
+        # self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeEndThreshold'), 30)
+
+        self.stop_daemon()
+
+        # On startup with threshold set
+        self.testbed.set_property("/sys/class/power_supply/BAT0", 'CHARGE_LIMIT', '90,100')
+        bat0_up = start_daemon("1")
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdSupported'), True)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdEnabled'), True)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeStartThreshold'), 90)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeEndThreshold'), 100)
+
+        with open('/sys/class/power_supply/BAT0/charge_control_start_threshold') as fp:
+            self.assertEqual(fp.read(), '90')
+        with open('/sys/class/power_supply/BAT0/charge_control_end_threshold') as fp:
+            self.assertEqual(fp.read(), '100')
+
+    def test_battery_charge_threshold_unsupported(self):
+        '''Battery with only end_threshold supported'''
+
+        self.testbed.add_device('power_supply', 'BAT0', None,
+                                ['type', 'Battery',
+                                 'present', '1',
+                                 'model_name', 'test',
+                                 'serial_number', '12',
+                                 'status', 'unknown',
+                                 'energy_full', '60000000',
+                                 'energy_full_design', '80000000',
+                                 'energy_now', '48000000',
+                                 'voltage_now', '12000000',
+                                 'charge_control_start_threshold', '80',
+                                 ], [])
+
+        self.start_daemon()
+        devs = self.proxy.EnumerateDevices()
+        self.assertEqual(len(devs), 1)
+        bat0_up = devs[0]
+
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdSupported'), False)
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'ChargeThresholdEnabled'), False)
+
+        try:
+            self.enable_charge_limits(bat0_up, True)
+        except Exception as err:
+            self.assertIn("setting battery charge thresholds", str(err))
+
         self.stop_daemon()
 
     def test_battery_zero_power_draw(self):

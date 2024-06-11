@@ -107,6 +107,10 @@ up_device_supply_reset_values (UpDeviceSupply *supply)
 		      "temperature", (gdouble) 0.0,
 		      "technology", UP_DEVICE_TECHNOLOGY_UNKNOWN,
 		      "charge-cycles", -1,
+		      "charge-start-threshold", 0,
+		      "charge-end-threshold", 100,
+		      "charge-threshold-enabled", FALSE,
+		      "charge-threshold-supported", FALSE,
 		      NULL);
 }
 
