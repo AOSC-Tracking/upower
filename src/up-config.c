@@ -123,18 +123,18 @@ up_config_init (UpConfig *config)
 	critical_action = up_config_get_string (config, "CriticalPowerAction");
 	allow_risky_critical_action = up_config_get_boolean (config, "AllowRiskyCriticalPowerAction");
 
-	if (!g_strcmp0 (critical_action, "Suspend")) {
+	if (!g_strcmp0 (critical_action, "Suspend") || !g_strcmp0 (critical_action, "Ignore")) {
 		if (allow_risky_critical_action) {
-			g_warning ("The \"Suspend\" CriticalPowerAction setting is considered risky:"
+			g_warning ("The \"%s\" CriticalPowerAction setting is considered risky:"
 				   " abrupt power loss due to battery exhaustion may lead to data"
 				   " corruption. Use AllowRiskyCriticalPowerAction=false to disable"
-				   " support for risky settings.");
+				   " support for risky settings.", critical_action);
 		} else {
-			g_warning ("The \"Suspend\" CriticalPowerAction setting is considered risky:"
+			g_warning ("The \"%s\" CriticalPowerAction setting is considered risky:"
 				   " abrupt power loss due to battery exhaustion may lead to data"
 				   " corruption. The system will perform \"HybridSleep\" instead."
 				   " Use AllowRiskyCriticalPowerAction=true to enable support for"
-				   " risky settings.");
+				   " risky settings.", critical_action);
 		}
 	}
 }

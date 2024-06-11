@@ -1332,6 +1332,103 @@ class Tests(dbusmock.DBusTestCase):
 
         os.unlink(config.name)
 
+    def test_critical_action_is_ignore_and_AllowRiskyCriticalPowerAction_is_true(self):
+        '''check that critical action is ignore'''
+
+        bat0 = self.testbed.add_device('power_supply', 'BAT0', None,
+                                       ['type', 'Battery',
+                                        'present', '1',
+                                        'status', 'Discharging',
+                                        'energy_full', '60000000',
+                                        'energy_full_design', '80000000',
+                                        'energy_now', '50000000',
+                                        'voltage_now', '12000000'], [])
+
+        config = tempfile.NamedTemporaryFile(delete=False, mode='w')
+        config.write("[UPower]\n")
+        config.write("UsePercentageForPolicy=true\n")
+        config.write("PercentageAction=5\n")
+        config.write("AllowRiskyCriticalPowerAction=true\n")
+        config.write("CriticalPowerAction=Ignore\n")
+        config.close()
+
+        self.start_daemon(cfgfile=config.name, warns=True)
+
+        devs = self.proxy.EnumerateDevices()
+        self.assertEqual(len(devs), 1)
+        bat0_up = devs[0]
+
+        # check warning message when CriticalPowerAction=Ignore and AllowRiskyCriticalPowerAction=true
+        self.daemon_log.check_line(
+            "The \"Ignore\" CriticalPowerAction setting is considered risky:"
+            " abrupt power loss due to battery exhaustion may lead to data"
+            " corruption. Use AllowRiskyCriticalPowerAction=false to disable"
+            " support for risky settings.",
+            timeout=UP_DAEMON_ACTION_DELAY + 0.5)
+
+        # simulate that battery has 1% (less than PercentageAction)
+        self.testbed.set_attribute(bat0, 'energy_now', '600000')
+        self.testbed.uevent(bat0, 'change')
+
+        time.sleep(0.5)
+        self.assertEqual(self.get_dbus_display_property('WarningLevel'), UP_DEVICE_LEVEL_ACTION)
+
+        self.daemon_log.check_line("About to call logind method Ignore", timeout=UP_DAEMON_ACTION_DELAY + 0.5)
+
+        self.stop_daemon()
+
+        os.unlink(config.name)
+
+    def test_critical_action_is_ignore_and_AllowRiskyCriticalPowerAction_is_false(self):
+        '''check that critical action is ignore'''
+
+        bat0 = self.testbed.add_device('power_supply', 'BAT0', None,
+                                       ['type', 'Battery',
+                                        'present', '1',
+                                        'status', 'Discharging',
+                                        'energy_full', '60000000',
+                                        'energy_full_design', '80000000',
+                                        'energy_now', '50000000',
+                                        'voltage_now', '12000000'], [])
+
+        config = tempfile.NamedTemporaryFile(delete=False, mode='w')
+        config.write("[UPower]\n")
+        config.write("UsePercentageForPolicy=true\n")
+        config.write("PercentageAction=5\n")
+        config.write("AllowRiskyCriticalPowerAction=false\n")
+        config.write("CriticalPowerAction=Ignore\n")
+        config.close()
+
+        self.start_daemon(cfgfile=config.name, warns=True)
+
+        devs = self.proxy.EnumerateDevices()
+        self.assertEqual(len(devs), 1)
+        bat0_up = devs[0]
+
+        # check warning message when CriticalPowerAction=Ignore and AllowRiskyCriticalPowerAction=true
+        self.daemon_log.check_line(
+            "The \"Ignore\" CriticalPowerAction setting is considered risky:"
+            " abrupt power loss due to battery exhaustion may lead to data"
+            " corruption. The system will perform \"HybridSleep\" instead."
+            " Use AllowRiskyCriticalPowerAction=true to enable support for"
+            " risky settings.", 
+            timeout=UP_DAEMON_ACTION_DELAY + 0.5)
+
+
+        # simulate that battery has 1% (less than PercentageAction)
+        self.testbed.set_attribute(bat0, 'energy_now', '600000')
+        self.testbed.uevent(bat0, 'change')
+
+        time.sleep(0.5)
+        self.assertEqual(self.get_dbus_display_property('WarningLevel'), UP_DEVICE_LEVEL_ACTION)
+
+        self.daemon_log.check_line("About to call logind method HybridSleep", timeout=UP_DAEMON_ACTION_DELAY + 0.5)
+
+        self.stop_daemon()
+
+        os.unlink(config.name)
+
+
     def test_low_battery_changes_history_save_interval(self):
         '''check that we save the history more quickly on low battery'''
 
