@@ -414,6 +414,43 @@ class Tests(dbusmock.DBusTestCase):
 
         self.assertEqual(self.get_dbus_dev_property(bat0_up, 'Percentage'), 80)
 
+    def test_macbook_energy_full_blip(self):
+        '''Value blip issue for Macbooks'''
+
+        ac = self.testbed.add_device('power_supply', 'AC', None,
+                                     ['type', 'Mains', 'online', '0'], [])
+        bat0 = self.testbed.add_device('power_supply', 'BAT0', None,
+                                       ['type', 'Battery',
+                                        'present', '1',
+                                        'status', 'Discharging',
+                                        'capacity', '60',
+                                        'energy_full', '60000000',
+                                        'energy_full_design', '80000000',
+                                        'energy_now', '48000000',
+                                        'voltage_now', '12000000'], [])
+        self.testbed.add_device('virtual', 'virtual/dmi', None,
+                                ['id/product_name', 'MacBookAir7,2'], [])
+        self.start_daemon()
+        devs = self.proxy.EnumerateDevices()
+        self.assertEqual(len(devs), 2)
+        if 'BAT' in devs[0] == ac_up:
+            (bat0_up, ac_up) = devs
+        else:
+            (ac_up, bat0_up) = devs
+        
+        # blip
+        self.testbed.set_attribute(bat0, 'energy_full', '600000000')
+        self.testbed.set_attribute(bat0, 'energy_now', '480000000')
+        self.testbed.uevent(bat0, 'change')
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'Percentage'), 80)
+
+        # go back to normal
+        self.testbed.set_attribute(bat0, 'energy_full', '60000000')
+        self.testbed.set_attribute(bat0, 'energy_now', '48000000')
+        self.testbed.uevent(bat0, 'change')
+        self.assertEqual(self.get_dbus_dev_property(bat0_up, 'Percentage'), 80)
+
+
     def test_macbook_uevent(self):
         '''MacBooks sent uevent 5 seconds before battery updates'''
 
