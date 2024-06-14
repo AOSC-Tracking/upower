@@ -100,6 +100,8 @@ G_DEPRECATED
 gboolean	 up_client_get_lid_is_present		(UpClient		*client);
 gboolean	 up_client_get_on_battery		(UpClient		*client);
 
+const char	*up_client_get_seat			(UpClient		*client);
+
 G_END_DECLS
 
 #endif /* __UP_CLIENT_H */

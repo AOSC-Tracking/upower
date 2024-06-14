@@ -68,6 +68,8 @@ GType		 up_device_get_type			(void);
 UpDevice	*up_device_new				(void);
 gchar		*up_device_to_text			(UpDevice		*device);
 
+gboolean         up_device_is_available_to_seat         (UpDevice               *device);
+
 /* sync versions */
 G_DEPRECATED
 gboolean	 up_device_refresh_sync			(UpDevice		*device,

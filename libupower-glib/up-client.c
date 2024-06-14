@@ -51,6 +51,7 @@ static void	up_client_finalize			(GObject	*object);
 struct _UpClientPrivate
 {
 	UpExportedDaemon *proxy;
+	char             *seat;
 };
 
 enum {
@@ -122,7 +123,7 @@ up_client_get_devices_full (UpClient      *client,
 		const char *object_path = devices[i];
 		gboolean ret;
 
-		device = up_device_new ();
+		device = g_object_new (UP_TYPE_DEVICE, "client", client, NULL);
 		ret = up_device_set_object_path_sync (device, object_path, cancellable, NULL);
 		if (!ret)
 			continue;
@@ -236,7 +237,7 @@ up_client_get_display_device (UpClient *client)
 	gboolean ret;
 	UpDevice *device;
 
-	device = up_device_new ();
+	device = g_object_new (UP_TYPE_DEVICE, "client", client, NULL);
 	ret = up_device_set_object_path_sync (device, "/org/freedesktop/UPower/devices/DisplayDevice", NULL, NULL);
 	if (!ret) {
 		g_object_unref (G_OBJECT (device));
@@ -348,7 +349,7 @@ up_client_add (UpClient *client, const gchar *object_path)
 	gboolean ret;
 
 	/* create new device */
-	device = up_device_new ();
+	device = g_object_new (UP_TYPE_DEVICE, "client", client, NULL);
 	ret = up_device_set_object_path_sync (device, object_path, NULL, NULL);
 	if (!ret)
 		goto out;
@@ -528,6 +529,50 @@ up_client_class_init (UpClientClass *klass)
 			      G_TYPE_NONE, 1, G_TYPE_STRING);
 }
 
+static char *
+get_seat (GCancellable *cancellable)
+{
+	g_autoptr(GError) error = NULL;
+	g_autoptr(GDBusConnection) connection = NULL;
+	g_autoptr(GVariant) variant = NULL;
+	g_autoptr(GVariant) inner = NULL;
+
+	connection = g_bus_get_sync (G_BUS_TYPE_SYSTEM,
+	                             cancellable,
+	                             &error);
+
+	if (connection == NULL) {
+		if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+			g_warning ("system bus not available: %s", error->message);
+
+		return NULL;
+	}
+
+	variant = g_dbus_connection_call_sync (connection,
+	                                       "org.freedesktop.login1",
+	                                       "/org/freedesktop/login1/seat/auto",
+	                                       "org.freedesktop.DBus.Properties",
+	                                       "Get",
+	                                       g_variant_new ("(ss)",
+	                                                      "org.freedesktop.login1.Seat",
+	                                                      "Id"),
+	                                       NULL,
+	                                       G_DBUS_CALL_FLAGS_NONE,
+	                                       -1,
+	                                       cancellable,
+	                                       &error);
+
+	if (variant == NULL) {
+		if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+			g_debug ("Failed to get seat name: %s", error->message);
+
+		return NULL;
+	}
+
+	g_variant_get (variant, "(v)", &inner);
+	return g_variant_dup_string (inner, NULL);
+}
+
 /*
  * up_client_init:
  * @client: This class instance
@@ -547,6 +592,8 @@ up_client_initable_init (GInitable *initable, GCancellable *cancellable, GError 
 									 error);
 	if (client->priv->proxy == NULL)
 		return FALSE;
+
+	client->priv->seat = get_seat (cancellable);
 
 	/* all callbacks */
 	g_signal_connect (client->priv->proxy, "device-added",
@@ -587,6 +634,7 @@ up_client_finalize (GObject *object)
 	client = UP_CLIENT (object);
 
 	g_clear_object (&client->priv->proxy);
+	g_clear_pointer (&client->priv->seat, g_free);
 
 	G_OBJECT_CLASS (up_client_parent_class)->finalize (object);
 }
@@ -717,3 +765,10 @@ up_client_new_finish (GAsyncResult  *res,
   return g_task_propagate_pointer (G_TASK (res), error);
 }
 
+const char *
+up_client_get_seat (UpClient *client)
+{
+	g_return_val_if_fail (UP_IS_CLIENT (client), NULL);
+
+	return client->priv->seat;
+}
